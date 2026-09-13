@@ -31,3 +31,16 @@ Wayland smokes **skip** (exit 77) when `WAYLAND_DISPLAY` is unset — normal in 
 meson test -C build --print-errorlogs
 meson test -C build buffer-pool-backlog smoke-backlog --print-errorlogs
 ```
+
+## Layer 4 — FluxCast / Omarchy integration
+
+Lives in the **fluxcast** tree (not this repo):
+
+- `tests/test_icc_integration.py` — `FLUXCAST_WFD_WF_RECORDER_PROTO=icc` accept/reject,
+  ICC capture rate (`-r 60` / `FLUXCAST_WFD_ICC_CAPTURE_FPS`), LPCM `-D`/`-r`,
+  optional live binary smoke when `FLUXCAST_WFD_WF_RECORDER_BIN` points at this build.
+
+```bash
+cd ~/code/other/fluxcast
+python3 -m unittest tests.test_icc_integration -v
+```
