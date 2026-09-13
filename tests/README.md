@@ -55,4 +55,10 @@ python3 -m unittest tests.test_icc_integration -v
 
 Shared logic: `src/icc-proto-check.hpp` (also used by `check_has_protos()` in `main.cpp`).
 
-Does **not** simulate a full frame capture session (dmabuf attach / damage / present) — that still needs a real compositor (Layer 2/3 smokes).
+## Layer 6 — mock ICC frame session
+
+| Test | What |
+|------|------|
+| `mock-wayland-icc-frame-session` | SHM path: `create_source` → `create_session` (buffer_size/shm_format/done) → `create_frame` → attach/damage/capture → **ready** |
+
+DMA-BUF frame fill and real damage/present still need a live compositor (Layer 2/3 smokes).

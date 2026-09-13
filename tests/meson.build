@@ -57,6 +57,19 @@ test(
   timeout: 30,
 )
 
+# Layer 6: mock ICC create_source → session → frame → ready (SHM path).
+mock_wayland_frame_test = executable(
+  'mock-wayland-icc-frame-session-test',
+  'mock-wayland-icc-frame-session-test.cpp',
+  dependencies: [threads_dep, wayland_server_dep, wayland_client_dep, wf_protos_server],
+)
+
+test(
+  'mock-wayland-icc-frame-session',
+  mock_wayland_frame_test,
+  timeout: 30,
+)
+
 signal_exit_test = executable(
   'signal-exit-test',
   'signal-exit-test.cpp',
