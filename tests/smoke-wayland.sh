@@ -39,7 +39,7 @@ ok "outputs(${#OUTPUTS[@]}): ${OUTPUTS[*]}"
 
 OUT0="${OUTPUTS[0]}"
 
-# --- short continuous capture, stop with SIGINT (Hyprland-safe teardown) ---
+# --- short continuous capture, stop with SIGINT (flags-only teardown) ---
 outfile="$tmpdir/cap.mp4"
 log="$tmpdir/cap.log"
 "$WF_RECORDER" -o "$OUT0" -f "$outfile" -y -c libx264 -r 30 -D \

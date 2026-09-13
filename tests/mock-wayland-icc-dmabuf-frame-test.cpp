@@ -2,7 +2,7 @@
  * Layer 7 — mock Wayland ICC DMA-BUF frame session.
  *
  * Session advertises dmabuf_format; client creates a linux-dmabuf wl_buffer
- * (memfd stand-in), attaches, captures, and expects ready — no Hyprland/GBM.
+ * (memfd stand-in), attaches, captures, and expects ready (no live GBM).
  */
 
 #include <atomic>

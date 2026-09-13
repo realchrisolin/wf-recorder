@@ -1,5 +1,5 @@
 /*
- * Unit tests for buffer_pool — Miracast/Extend latency contract:
+ * Unit tests for buffer_pool:
  * prefer the newest captured frame over queue depth; never abort when full.
  */
 

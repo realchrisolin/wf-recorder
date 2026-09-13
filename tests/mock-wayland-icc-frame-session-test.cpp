@@ -2,7 +2,7 @@
  * Layer 6 — mock Wayland ICC frame session.
  *
  * Drives create_source → create_session → (buffer_size/shm_format/done) →
- * create_frame → attach/damage/capture → ready, without Hyprland.
+ * create_frame → attach/damage/capture → ready (no live compositor).
  */
 
 #include <atomic>

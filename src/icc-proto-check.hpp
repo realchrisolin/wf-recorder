@@ -5,7 +5,7 @@
  *
  * Mirrors check_has_protos() / handle_global() binding rules in main.cpp so
  * unit and mock-Wayland tests can lock the compositor contract without a
- * full Hyprland session.
+ * full live compositor session.
  */
 
 #include <cstring>

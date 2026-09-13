@@ -7,9 +7,9 @@
 #include <mutex>
 #include <type_traits>
 
-/* Interactive capture (terminals on a Miracast head) needs newest-frame
- * priority. Cap growth so we never abort; when full, discard the oldest
- * pending encode and reuse that slot — never drop the frame just captured. */
+/* Prefer newest frames under encode backlog (interactive capture). Cap
+ * growth so we never abort; when full, discard the oldest pending encode
+ * and reuse that slot — never drop the frame just captured. */
 #define MAX_FRAME_FAILURES 16
 #define INITIAL_BUFFERS_SIZE 4
 

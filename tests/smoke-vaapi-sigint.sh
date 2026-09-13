@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Layer 3: Ctrl+C during DMA-BUF VAAPI capture must exit cleanly on Hyprland.
+# Layer 3: Ctrl+C during DMA-BUF VAAPI capture must exit cleanly.
 # Skips (77) without Wayland or without a render node / h264_vaapi.
 set -euo pipefail
 
@@ -84,7 +84,7 @@ if [[ "$ec" -ne 0 && "$ec" -ne 130 ]]; then
 fi
 
 if grep -qiE 'Too many bits for size_t|segmentation fault' "$log"; then
-  fail "Hyprland/teardown abort pattern in log"
+  fail "teardown abort pattern in log"
 fi
 
 ok "SIGINT exit=$ec size=$(wc -c <"$outfile" | tr -d ' ')"

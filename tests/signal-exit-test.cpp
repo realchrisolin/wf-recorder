@@ -1,6 +1,6 @@
 /*
  * Contract test: graceful termination from a signal context must only flip
- * flags — never tear down Wayland (Hyprland aborts if dispatch races SIGINT).
+ * flags — never tear down Wayland (dispatch races SIGINT / SIGTERM).
  *
  * Mirrors handle_graceful_termination() in src/main.cpp.
  */

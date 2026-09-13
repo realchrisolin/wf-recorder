@@ -2,8 +2,7 @@
  * Layer 3 — backlog / newest-wins contract for buffer_pool.
  *
  * When capture outruns encode, drop-oldest must prefer recent frames so
- * interactive content (terminals on a Miracast head) is not stuck behind
- * a multi-second queue.
+ * interactive content is not stuck behind a multi-second queue.
  */
 
 #include "buffer-pool.hpp"

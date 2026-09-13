@@ -21,9 +21,7 @@
 |------|------|
 | `buffer-pool-backlog` | Tagged seq flood: after drop-oldest, drained frames are the **newest** window; slow-encode thread still tracks recent seqs |
 | `smoke-backlog` | Wayland: `-D -r 60` + libx264 pressure, hold ~3s, SIGINT; no abort (`buffer pool full` OK) |
-| `smoke-vaapi-sigint` | Wayland+VAAPI: DMA-BUF capture, SIGINT clean exit (Hyprland teardown race) |
-
-**Out of scope for wf-recorder:** typing lag on idle ICC outputs when the compositor only `scheduleFrame`s on the first share — that is a Hyprland bug/patch, not a client failure.
+| `smoke-vaapi-sigint` | Wayland+VAAPI: DMA-BUF capture, SIGINT clean exit |
 
 Wayland smokes **skip** (exit 77) when `WAYLAND_DISPLAY` is unset — normal in headless CI. VAAPI smoke also skips without `renderD128` / `h264_vaapi`.
 
@@ -32,21 +30,7 @@ meson test -C build --print-errorlogs
 meson test -C build buffer-pool-backlog smoke-backlog --print-errorlogs
 ```
 
-## Layer 4 — FluxCast / Omarchy integration
-
-Lives in the **fluxcast** tree (not this repo):
-
-- `tests/test_icc_integration.py` — `FLUXCAST_WFD_WF_RECORDER_PROTO=icc` accept/reject,
-  ICC capture rate (`-r` = stream `config.fps`, override via `FLUXCAST_WFD_ICC_CAPTURE_FPS`),
-  LPCM `-D`/`-r`, optional live binary smoke when `FLUXCAST_WFD_WF_RECORDER_BIN`
-  points at this build.
-
-```bash
-cd ~/code/other/fluxcast
-python3 -m unittest tests.test_icc_integration -v
-```
-
-## Layer 5 — mock Wayland / ICC protocol contract
+## Layer 4 — mock Wayland / ICC protocol contract
 
 | Test | What |
 |------|------|
@@ -55,13 +39,13 @@ python3 -m unittest tests.test_icc_integration -v
 
 Shared logic: `src/icc-proto-check.hpp` (also used by `check_has_protos()` in `main.cpp`).
 
-## Layer 6 — mock ICC frame session
+## Layer 5 — mock ICC frame session
 
 | Test | What |
 |------|------|
 | `mock-wayland-icc-frame-session` | SHM path: `create_source` → `create_session` (buffer_size/shm_format/done) → `create_frame` → attach/damage/capture → **ready** |
 
-## Layer 7 — mock ICC DMA-BUF frame session
+## Layer 6 — mock ICC DMA-BUF frame session
 
 | Test | What |
 |------|------|
