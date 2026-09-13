@@ -61,4 +61,10 @@ Shared logic: `src/icc-proto-check.hpp` (also used by `check_has_protos()` in `m
 |------|------|
 | `mock-wayland-icc-frame-session` | SHM path: `create_source` → `create_session` (buffer_size/shm_format/done) → `create_frame` → attach/damage/capture → **ready** |
 
-DMA-BUF frame fill and real damage/present still need a live compositor (Layer 2/3 smokes).
+## Layer 7 — mock ICC DMA-BUF frame session
+
+| Test | What |
+|------|------|
+| `mock-wayland-icc-dmabuf-frame` | DMA path: session advertises `dmabuf_device`/`dmabuf_format`; client `linux-dmabuf` `create_immed` (memfd stand-in) → attach/capture → **ready** |
+
+Real GBM import / GPU present still need a live compositor (Layer 2/3 VAAPI smokes).

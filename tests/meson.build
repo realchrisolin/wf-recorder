@@ -70,6 +70,20 @@ test(
   timeout: 30,
 )
 
+# Layer 7: mock ICC DMA-BUF session → create_immed buffer → capture → ready.
+libdrm_dep = dependency('libdrm')
+mock_wayland_dmabuf_test = executable(
+  'mock-wayland-icc-dmabuf-frame-test',
+  'mock-wayland-icc-dmabuf-frame-test.cpp',
+  dependencies: [threads_dep, wayland_server_dep, wayland_client_dep, wf_protos_server, libdrm_dep],
+)
+
+test(
+  'mock-wayland-icc-dmabuf-frame',
+  mock_wayland_dmabuf_test,
+  timeout: 30,
+)
+
 signal_exit_test = executable(
   'signal-exit-test',
   'signal-exit-test.cpp',

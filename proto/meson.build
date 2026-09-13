@@ -27,8 +27,9 @@ client_protocols = [
     [wl_protocol_dir, 'staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml'],
 ]
 
-# Server headers only needed for ICC mock compositor tests (Layer 6).
+# Server headers for ICC mock compositor tests (Layers 6–7).
 server_protocols = [
+    [wl_protocol_dir, 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml'],
     [wl_protocol_dir, 'staging/ext-image-capture-source/ext-image-capture-source-v1.xml'],
     [wl_protocol_dir, 'staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml'],
 ]
