@@ -29,6 +29,34 @@ test(
   timeout: 30,
 )
 
+# Layer 5a: ICC registry requirement / classify rules (no compositor).
+icc_proto_check_test = executable(
+  'icc-proto-check-test',
+  'icc-proto-check-test.cpp',
+  include_directories: include_directories('../src'),
+)
+
+test(
+  'icc-proto-check',
+  icc_proto_check_test,
+)
+
+# Layer 5b: mock Wayland registry advertising ICC globals.
+wayland_server_dep = dependency('wayland-server')
+wayland_client_dep = dependency('wayland-client')
+mock_wayland_icc_test = executable(
+  'mock-wayland-icc-registry-test',
+  'mock-wayland-icc-registry-test.cpp',
+  include_directories: include_directories('../src'),
+  dependencies: [threads_dep, wayland_server_dep, wayland_client_dep, wf_protos],
+)
+
+test(
+  'mock-wayland-icc-registry',
+  mock_wayland_icc_test,
+  timeout: 30,
+)
+
 signal_exit_test = executable(
   'signal-exit-test',
   'signal-exit-test.cpp',

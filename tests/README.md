@@ -45,3 +45,14 @@ Lives in the **fluxcast** tree (not this repo):
 cd ~/code/other/fluxcast
 python3 -m unittest tests.test_icc_integration -v
 ```
+
+## Layer 5 — mock Wayland / ICC protocol contract
+
+| Test | What |
+|------|------|
+| `icc-proto-check` | Classify/bind rules + `check_has_protos` messages for output vs toplevel vs DMA |
+| `mock-wayland-icc-registry` | `wayland-server` stub compositor advertises ICC globals; client scan must pass (and fail when copy-capture is omitted) |
+
+Shared logic: `src/icc-proto-check.hpp` (also used by `check_has_protos()` in `main.cpp`).
+
+Does **not** simulate a full frame capture session (dmabuf attach / damage / present) — that still needs a real compositor (Layer 2/3 smokes).

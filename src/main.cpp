@@ -25,6 +25,7 @@
 
 #include "frame-writer.hpp"
 #include "buffer-pool.hpp"
+#include "icc-proto-check.hpp"
 #include "ext-foreign-toplevel-list-v1-client-protocol.h"
 #include "ext-image-copy-capture-v1-client-protocol.h"
 #include "ext-image-capture-source-v1-client-protocol.h"
@@ -893,45 +894,18 @@ static bool user_specified_overwrite(std::string filename)
 
 static void check_has_protos()
 {
-    if (shm == NULL) {
-        fprintf(stderr, "compositor is missing wl_shm\n");
-        exit(EXIT_FAILURE);
-    }
+    icc_registry_flags flags;
+    flags.has_shm = (shm != NULL);
+    flags.has_copy_capture_manager = (copy_capture_manager != NULL);
+    flags.has_output_image_capture = (output_image_capture != NULL);
+    flags.has_foreign_toplevel_list = (foreign_toplevel_list != NULL);
+    flags.has_toplevel_image_capture = (toplevel_image_capture != NULL);
+    flags.has_xdg_output = (xdg_output_manager != NULL);
+    flags.has_dmabuf = (dmabuf != NULL);
+    flags.output_count = static_cast<int>(available_outputs.size());
 
-    if (!capture_toplevel && output_image_capture == NULL) {
-        fprintf(stderr, "compositor doesn't support ext-output-image-capture-source-manager-v1\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (capture_toplevel && foreign_toplevel_list == NULL) {
-        fprintf(stderr, "compositor doesn't support ext-foreign-toplevel-list-v1\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (capture_toplevel && toplevel_image_capture == NULL) {
-        fprintf(stderr, "compositor doesn't support ext-foreign-toplevel-image-capture-source-manager-v1\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (copy_capture_manager == NULL) {
-        fprintf(stderr, "compositor doesn't support ext-image-copy-capture-manager-v1\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (xdg_output_manager == NULL)
-    {
-        fprintf(stderr, "compositor doesn't support xdg-output-unstable-v1\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (use_dmabuf && dmabuf == NULL) {
-        fprintf(stderr, "compositor doesn't support linux-dmabuf-unstable-v1\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (available_outputs.empty())
-    {
-        fprintf(stderr, "no outputs available\n");
+    if (const char *missing = icc_missing_requirement(flags, capture_toplevel, use_dmabuf)) {
+        fprintf(stderr, "%s\n", missing);
         exit(EXIT_FAILURE);
     }
 }
