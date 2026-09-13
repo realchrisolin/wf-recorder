@@ -36,3 +36,25 @@ test(
   ffmpeg_pixfmt_test,
   timeout: 30,
 )
+
+# Layer 2: ICC client feature detection (no compositor required).
+icc_features = find_program('icc-client-features.sh')
+test(
+  'icc-client-features',
+  icc_features,
+  args: [wf_recorder],
+  depends: [wf_recorder],
+  timeout: 30,
+)
+
+# Layer 2: Wayland smoke (list outputs + short capture + SIGINT).
+# Exit 77 = skip when WAYLAND_DISPLAY is unset (headless CI).
+smoke_wayland = find_program('smoke-wayland.sh')
+test(
+  'smoke-wayland',
+  smoke_wayland,
+  args: [wf_recorder],
+  depends: [wf_recorder],
+  is_parallel: false,
+  timeout: 60,
+)
