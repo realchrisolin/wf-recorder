@@ -13,6 +13,12 @@ wayland_scanner_client = generator(
 	arguments: ['client-header', '@INPUT@', '@OUTPUT@'],
 )
 
+wayland_scanner_server = generator(
+	wayland_scanner,
+	output: '@BASENAME@-server-protocol.h',
+	arguments: ['server-header', '@INPUT@', '@OUTPUT@'],
+)
+
 client_protocols = [
     [wl_protocol_dir, 'unstable/xdg-output/xdg-output-unstable-v1.xml'],
     [wl_protocol_dir, 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml'],
@@ -21,13 +27,26 @@ client_protocols = [
     [wl_protocol_dir, 'staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml'],
 ]
 
+# Server headers for ICC mock compositor tests (Layers 6–7).
+server_protocols = [
+    [wl_protocol_dir, 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml'],
+    [wl_protocol_dir, 'staging/ext-image-capture-source/ext-image-capture-source-v1.xml'],
+    [wl_protocol_dir, 'staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml'],
+]
+
 wl_protos_client_src = []
 wl_protos_headers = []
+wl_protos_server_headers = []
 
 foreach p : client_protocols
 	xml = join_paths(p)
 	wl_protos_client_src += wayland_scanner_code.process(xml)
 	wl_protos_headers += wayland_scanner_client.process(xml)
+endforeach
+
+foreach p : server_protocols
+	xml = join_paths(p)
+	wl_protos_server_headers += wayland_scanner_server.process(xml)
 endforeach
 
 lib_wl_protos = static_library('wl_protos', wl_protos_client_src + wl_protos_headers,
@@ -36,4 +55,9 @@ lib_wl_protos = static_library('wl_protos', wl_protos_client_src + wl_protos_hea
 wf_protos = declare_dependency(
 	link_with: lib_wl_protos,
 	sources: wl_protos_headers,
+)
+
+wf_protos_server = declare_dependency(
+	link_with: lib_wl_protos,
+	sources: wl_protos_headers + wl_protos_server_headers,
 )

@@ -138,9 +138,11 @@ dependencies = [
     wf_protos, threads, swr, gbm, drm
 ] + audio_deps
 
-executable('wf-recorder', project_sources,
+wf_recorder = executable('wf-recorder', project_sources,
         dependencies: dependencies,
         install: true)
+
+subdir('tests')
 
 summary = [
 	'',

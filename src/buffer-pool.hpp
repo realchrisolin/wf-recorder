@@ -1,9 +1,10 @@
 #pragma once
 
 #include <array>
-#include <mutex>
 #include <atomic>
 #include <functional>
+#include <iostream>
+#include <mutex>
 #include <type_traits>
 
 /* Interactive capture (terminals on a Miracast head) needs newest-frame
