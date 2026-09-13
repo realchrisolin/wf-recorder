@@ -142,6 +142,8 @@ executable('wf-recorder', project_sources,
         dependencies: dependencies,
         install: true)
 
+subdir('tests')
+
 summary = [
 	'',
 	'----------------',
