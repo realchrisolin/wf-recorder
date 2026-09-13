@@ -5,6 +5,7 @@
 
 #include <list>
 #include <string>
+#include <cstdlib>
 #include <mutex>
 #include <atomic>
 #include <getopt.h>
@@ -1759,7 +1760,14 @@ int main(int argc, char *argv[])
 
             fprintf(stderr, "selected region %d,%d %dx%d\n", selected_region.x, selected_region.y, selected_region.width, selected_region.height);
         }
-        recording_session = ext_image_copy_capture_manager_v1_create_session(copy_capture_manager, copy_capture_source, EXT_IMAGE_COPY_CAPTURE_MANAGER_V1_OPTIONS_PAINT_CURSORS);
+        {
+            uint32_t icc_opts = EXT_IMAGE_COPY_CAPTURE_MANAGER_V1_OPTIONS_PAINT_CURSORS;
+            const char *no_paint = getenv("WF_RECORDER_NO_PAINT_CURSORS");
+            if (no_paint && no_paint[0] && no_paint[0] != '0')
+                icc_opts = 0;
+            recording_session = ext_image_copy_capture_manager_v1_create_session(
+                copy_capture_manager, copy_capture_source, icc_opts);
+        }
         ext_image_copy_capture_session_v1_add_listener(recording_session, &recording_session_listener, NULL);
         sync_wayland();
         wl_display_flush(display);
