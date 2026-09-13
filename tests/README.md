@@ -37,8 +37,9 @@ meson test -C build buffer-pool-backlog smoke-backlog --print-errorlogs
 Lives in the **fluxcast** tree (not this repo):
 
 - `tests/test_icc_integration.py` — `FLUXCAST_WFD_WF_RECORDER_PROTO=icc` accept/reject,
-  ICC capture rate (`-r 60` / `FLUXCAST_WFD_ICC_CAPTURE_FPS`), LPCM `-D`/`-r`,
-  optional live binary smoke when `FLUXCAST_WFD_WF_RECORDER_BIN` points at this build.
+  ICC capture rate (`-r` = stream `config.fps`, override via `FLUXCAST_WFD_ICC_CAPTURE_FPS`),
+  LPCM `-D`/`-r`, optional live binary smoke when `FLUXCAST_WFD_WF_RECORDER_BIN`
+  points at this build.
 
 ```bash
 cd ~/code/other/fluxcast
