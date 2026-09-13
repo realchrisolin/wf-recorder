@@ -6,10 +6,11 @@
 #include <functional>
 #include <type_traits>
 
-/* Keep small: each queued buffer is a frame of end-to-end lag. Grow a little
- * for burstiness, then drop captures — never sleep, never abort. */
-#define MAX_FRAME_FAILURES 6
-#define INITIAL_BUFFERS_SIZE 2
+/* Interactive capture (terminals on a Miracast head) needs newest-frame
+ * priority. Cap growth so we never abort; when full, discard the oldest
+ * pending encode and reuse that slot — never drop the frame just captured. */
+#define MAX_FRAME_FAILURES 16
+#define INITIAL_BUFFERS_SIZE 4
 
 class buffer_pool_buf
 {
@@ -85,18 +86,23 @@ public:
                 bufs[bufs_size - 1] = new T;
                 next = (capture_idx + 1) % bufs_size;
             }
-            else
+            else if (encode_idx != capture_idx)
             {
-                /* Encoder behind: drop *this* captured frame and keep the
-                 * current slot. Do not exit (kills Miracast), do not sleep
-                 * (lags input), do not touch encode_idx (caused cursor lag). */
+                /* Drop oldest pending encode; keep the frame we just captured. */
                 static bool warned = false;
                 if (!warned)
                 {
-                    std::cerr << "buffer pool full; dropping capture frame"
+                    std::cerr << "buffer pool full; dropping oldest pending frame"
                               << std::endl;
                     warned = true;
                 }
+                bufs[encode_idx]->available = false;
+                bufs[encode_idx]->released = true;
+                next = encode_idx;
+                encode_idx = (encode_idx + 1) % bufs_size;
+            }
+            else
+            {
                 bufs[capture_idx]->released = true;
                 bufs[capture_idx]->available = false;
                 return *bufs[capture_idx];
