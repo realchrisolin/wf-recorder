@@ -15,6 +15,20 @@ test(
   timeout: 30,
 )
 
+# Layer 3: newest-wins under capture/encode backlog (no compositor).
+buffer_pool_backlog_test = executable(
+  'buffer-pool-backlog-test',
+  'buffer-pool-backlog-test.cpp',
+  include_directories: include_directories('../src'),
+  dependencies: [threads_dep],
+)
+
+test(
+  'buffer-pool-backlog',
+  buffer_pool_backlog_test,
+  timeout: 30,
+)
+
 signal_exit_test = executable(
   'signal-exit-test',
   'signal-exit-test.cpp',
@@ -57,4 +71,26 @@ test(
   depends: [wf_recorder],
   is_parallel: false,
   timeout: 60,
+)
+
+# Layer 3: high-fps backlog + SIGINT (Wayland). Skip without display.
+smoke_backlog = find_program('smoke-backlog.sh')
+test(
+  'smoke-backlog',
+  smoke_backlog,
+  args: [wf_recorder],
+  depends: [wf_recorder],
+  is_parallel: false,
+  timeout: 90,
+)
+
+# Layer 3: VAAPI DMA-BUF + SIGINT clean exit. Skip without GPU/Wayland.
+smoke_vaapi = find_program('smoke-vaapi-sigint.sh')
+test(
+  'smoke-vaapi-sigint',
+  smoke_vaapi,
+  args: [wf_recorder],
+  depends: [wf_recorder],
+  is_parallel: false,
+  timeout: 90,
 )

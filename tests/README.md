@@ -15,10 +15,19 @@
 | `icc-client-features` | `--toplevel` in help; binary linked with `ext-image-copy-capture` symbols (no compositor) |
 | `smoke-wayland` | `-L` outputs, ~1.5s capture, SIGINT exit 0; notes multi-output if ≥2 heads |
 
-`smoke-wayland` **skips** (exit 77) when `WAYLAND_DISPLAY` is unset — normal in headless CI.
+## Layer 3 — latency / backlog
+
+| Test | What |
+|------|------|
+| `buffer-pool-backlog` | Tagged seq flood: after drop-oldest, drained frames are the **newest** window; slow-encode thread still tracks recent seqs |
+| `smoke-backlog` | Wayland: `-D -r 60` + libx264 pressure, hold ~3s, SIGINT; no abort (`buffer pool full` OK) |
+| `smoke-vaapi-sigint` | Wayland+VAAPI: DMA-BUF capture, SIGINT clean exit (Hyprland teardown race) |
+
+**Out of scope for wf-recorder:** typing lag on idle ICC outputs when the compositor only `scheduleFrame`s on the first share — that is a Hyprland bug/patch, not a client failure.
+
+Wayland smokes **skip** (exit 77) when `WAYLAND_DISPLAY` is unset — normal in headless CI. VAAPI smoke also skips without `renderD128` / `h264_vaapi`.
 
 ```bash
 meson test -C build --print-errorlogs
-# Wayland-only:
-meson test -C build smoke-wayland --print-errorlogs
+meson test -C build buffer-pool-backlog smoke-backlog --print-errorlogs
 ```
