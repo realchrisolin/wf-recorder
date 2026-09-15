@@ -6,6 +6,9 @@
 #include <iostream>
 #include "frame-writer.hpp"
 #include <libavfilter/version.h>
+#include <algorithm>
+#include <climits>
+#include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include "averr.h"
@@ -526,18 +529,85 @@ void FrameWriter::fini_video_stream()
     avcodec_free_context(&videoCodecCtx);
 }
 
+// Parse ffmpeg-style bitrate strings ("14M", "7000k", "14000000") to bits/s.
+static int64_t parse_bitrate_bits(const std::string &text)
+{
+    if (text.empty())
+        return 0;
+    char *end = nullptr;
+    double value = std::strtod(text.c_str(), &end);
+    if (end == text.c_str())
+        return 0;
+    while (*end == ' ')
+        ++end;
+    switch (*end) {
+    case 'G': case 'g': value *= 1000000000.0; break;
+    case 'M': case 'm': value *= 1000000.0; break;
+    case 'K': case 'k': value *= 1000.0; break;
+    default: break;
+    }
+    if (value < 0)
+        return 0;
+    return static_cast<int64_t>(value);
+}
+
 void FrameWriter::init_video_stream()
 {
     videoCodecCtx = avcodec_alloc_context3(codec);
     videoCodecCtx->width      = params.width;
     videoCodecCtx->height     = params.height;
-    videoCodecCtx->time_base  = US_RATIONAL;
+
+    auto opt_or = [this](std::initializer_list<const char *> keys) -> std::string {
+        for (const char *key : keys) {
+            auto it = params.codec_options.find(key);
+            if (it != params.codec_options.end() && !it->second.empty())
+                return it->second;
+        }
+        return {};
+    };
+    const std::string b_txt = opt_or({"b", "bit_rate", "bitrate"});
+    const std::string max_txt = opt_or({"maxrate", "rc_max_rate"});
+    const std::string buf_txt = opt_or({"bufsize", "rc_buffer_size"});
+    const std::string rc_txt = opt_or({"rc_mode"});
+    const int64_t bit_rate = parse_bitrate_bits(b_txt);
+    const int64_t max_rate = parse_bitrate_bits(max_txt);
+    const int64_t buf_size = parse_bitrate_bits(buf_txt);
+    // Default capture path uses microsecond stamps. Bitrate RC (CBR/VBR/QVBR)
+    // on h264_vaapi needs a frame-rate time_base or Intel BRC undershoots to
+    // ~0.5–3 Mbps despite bit_rate being set (on-device Miracast).
+    const bool want_bitrate_rc = bit_rate > 0
+        || rc_txt == "CBR" || rc_txt == "VBR" || rc_txt == "QVBR" || rc_txt == "AVBR";
     if (params.framerate) {
         std::cerr << "Framerate: " << params.framerate << std::endl;
+        videoCodecCtx->framerate = AVRational{params.framerate, 1};
+        if (want_bitrate_rc)
+            videoCodecCtx->time_base = AVRational{1, params.framerate};
+        else
+            videoCodecCtx->time_base = US_RATIONAL;
+    } else {
+        videoCodecCtx->time_base = US_RATIONAL;
     }
 
     if (params.bframes != -1)
         videoCodecCtx->max_b_frames = params.bframes;
+
+    // Push bitrate/HRD onto AVCodecContext before avcodec_open2. Passing only
+    // private -p dict entries is unreliable for h264_vaapi CBR/VBR with DMA-BUF
+    // (on-device: ~2–3 Mbps actual vs 14 Mbps requested). Mirror ffmpeg -b:v.
+    if (bit_rate > 0) {
+        videoCodecCtx->bit_rate = bit_rate;
+        std::cerr << "Applying codec bit_rate: " << bit_rate << std::endl;
+    }
+    if (max_rate > 0) {
+        videoCodecCtx->rc_max_rate = max_rate;
+        std::cerr << "Applying codec rc_max_rate: " << max_rate << std::endl;
+    } else if (bit_rate > 0) {
+        videoCodecCtx->rc_max_rate = bit_rate;
+    }
+    if (buf_size > 0) {
+        videoCodecCtx->rc_buffer_size = static_cast<int>(std::min<int64_t>(buf_size, INT_MAX));
+        std::cerr << "Applying codec rc_buffer_size: " << videoCodecCtx->rc_buffer_size << std::endl;
+    }
 
     if (!params.hw_device.empty()) {
         init_hw_accel();
@@ -557,7 +627,9 @@ void FrameWriter::init_video_stream()
         videoCodecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     }
 
-    av_dict_set_int(&options, "async_depth", 1, 0);
+    // Default async_depth=1 only when the caller did not pass -p async_depth.
+    if (!av_dict_get(options, "async_depth", NULL, 0))
+        av_dict_set_int(&options, "async_depth", 1, 0);
     videoCodecCtx->thread_type = FF_THREAD_FRAME;
 
     int ret;
