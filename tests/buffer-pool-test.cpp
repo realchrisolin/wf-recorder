@@ -85,6 +85,46 @@ static void test_capture_encode_handshake()
     EXPECT(pool.size() == INITIAL_BUFFERS_SIZE);
 }
 
+/* pending() counts frames waiting for encode; drains on next_encode. */
+static void test_pending_counts_backlog()
+{
+    buffer_pool<buffer_pool_buf, MAX_FRAME_FAILURES> pool;
+    EXPECT(pool.pending() == 0);
+
+    pool.next_capture();
+    EXPECT(pool.pending() == 1);
+    pool.next_capture();
+    EXPECT(pool.pending() == 2);
+
+    EXPECT(pool.encode().ready_encode() == true);
+    pool.next_encode();
+    EXPECT(pool.pending() == 1);
+    pool.next_encode();
+    EXPECT(pool.pending() == 0);
+
+    /* Capture without encode until soft high-water is reached (or cap). */
+    size_t peak = 0;
+    for (int i = 0; i < MAX_FRAME_FAILURES * 3; ++i) {
+        pool.next_capture();
+        size_t p = pool.pending();
+        if (p > peak) {
+            peak = p;
+        }
+        if (p >= BUFFER_POOL_HIGH_WATER) {
+            break;
+        }
+    }
+    EXPECT(peak >= BUFFER_POOL_HIGH_WATER);
+    EXPECT(pool.pending() <= MAX_FRAME_FAILURES);
+
+    /* Draining encode reduces pending. */
+    size_t before = pool.pending();
+    EXPECT(before > 0);
+    EXPECT(pool.encode().ready_encode() == true);
+    pool.next_encode();
+    EXPECT(pool.pending() == before - 1);
+}
+
 /* Concurrent capture/encode threads must not deadlock. */
 static void test_concurrent_capture_encode()
 {
@@ -146,6 +186,7 @@ int main()
     test_grows_until_cap();
     test_drop_oldest_when_full();
     test_capture_encode_handshake();
+    test_pending_counts_backlog();
     test_concurrent_capture_encode();
     test_full_same_index_path();
 

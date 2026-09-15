@@ -12,6 +12,8 @@
  * and reuse that slot — never drop the frame just captured. */
 #define MAX_FRAME_FAILURES 16
 #define INITIAL_BUFFERS_SIZE 4
+/* Soft backpressure: pause capture before the ring is forced to drop. */
+#define BUFFER_POOL_HIGH_WATER (MAX_FRAME_FAILURES - 2)
 
 class buffer_pool_buf
 {
@@ -58,6 +60,19 @@ public:
     const T* at(size_t i) const
     {
         return bufs[i];
+    }
+
+    /* Frames queued for encode (available=true). Used for soft backpressure. */
+    size_t pending() const
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        size_t n = 0;
+        for (size_t i = 0; i < bufs_size; ++i) {
+            if (bufs[i]->ready_encode()) {
+                ++n;
+            }
+        }
+        return n;
     }
 
     T& capture()
@@ -129,7 +144,7 @@ public:
     }
 
 private:
-    std::mutex mutex;
+    mutable std::mutex mutex;
     std::array<T*, MAX_FRAME_FAILURES> bufs;
     size_t bufs_size = INITIAL_BUFFERS_SIZE;
     int capture_idx = 0; // head

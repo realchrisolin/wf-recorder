@@ -218,6 +218,8 @@ static std::vector<damage_rect> damage_rects, last_damage_rects;
 std::atomic<bool> exit_main_loop{false};
 
 buffer_pool<wf_buffer, INITIAL_BUFFERS_SIZE> buffers;
+/* Updated by encode thread; capture side logs if backlog + stall. */
+std::atomic<uint64_t> encode_last_time_ms{0};
 
 bool buffer_copy_done = false;
 
@@ -725,7 +727,7 @@ static void write_loop(FrameWriterParams params)
 
     std::optional<uint64_t> first_frame_ts;
 
-    uint64_t encode_last_time = get_current_msec();
+    encode_last_time_ms.store(get_current_msec());
 
     while(!exit_main_loop)
     {
@@ -733,11 +735,22 @@ static void write_loop(FrameWriterParams params)
          * 1/framerate here — request_next_frame() already rate-limits capture.
          * Double pacing lets capture run ahead of encode and fills the buffer
          * pool (immediate backlog / lag on fast ICC paths). */
+        uint64_t wait_started = get_current_msec();
+        bool stall_logged = false;
         while (buffers.encode().ready_encode() != true && !exit_main_loop)
         {
+            uint64_t now = get_current_msec();
+            if (!stall_logged && buffers.pending() > 0 &&
+                now > wait_started + 1000)
+            {
+                std::cerr << "encode stall: waiting for frame >1000ms "
+                          << "(pending=" << buffers.pending() << ")"
+                          << std::endl;
+                stall_logged = true;
+            }
             std::this_thread::sleep_for(std::chrono::microseconds(idle_time));
         }
-        encode_last_time = get_current_msec();
+        encode_last_time_ms.store(get_current_msec());
 
         if (exit_main_loop) {
             break;
@@ -833,8 +846,11 @@ static void write_loop(FrameWriterParams params)
                     void *data = gbm_bo_map(buffer->bo, 0, 0, buffer->width, buffer->height,
                         GBM_BO_TRANSFER_READ, &stride, &map_data);
                     if (!data) {
-                        std::cerr << "Failed to map bo" << std::endl;
-                        break;
+                        std::cerr << "Failed to map bo; dropping frame"
+                                  << std::endl;
+                        frame_writer_mutex.unlock();
+                        buffers.next_encode();
+                        continue;
                     }
                     do_cont = frame_writer->add_frame(buffer->width, buffer->height, (unsigned char*)data,
                         sync_timestamp, buffer->y_invert);
@@ -859,11 +875,16 @@ static void write_loop(FrameWriterParams params)
         frame_writer_mutex.unlock();
 
         if (!do_cont) {
-
-            break;
+            /* Keep capture alive: drop this frame and continue encoding. */
+            std::cerr << "encode frame failed; dropping and continuing"
+                      << std::endl;
+            buffers.next_encode();
+            encode_last_time_ms.store(get_current_msec());
+            continue;
         }
 
         buffers.next_encode();
+        encode_last_time_ms.store(get_current_msec());
     }
     std::lock_guard<std::mutex> lock(frame_writer_mutex);
     /* Free the AudioReader connection first. This way it'd flush any remaining
@@ -1262,10 +1283,30 @@ void request_next_frame(bool reallocate)
     uint64_t elapsed = get_current_msec() - capture_last_time;
     uint64_t ms = 1000 / framerate;
 
-    // wait for a free buffer
-    while((buffers.capture().ready_capture() != true || elapsed < ms) && !exit_main_loop)
+    // Wait for a free buffer, framerate pace, and soft encode backpressure.
+    // When pending is near the pool cap, pause capture so a slow/stalled
+    // stdout consumer (e.g. ffmpeg VAAPI pipe) does not storm bufs_size.
+    bool backpressure_logged = false;
+    while (!exit_main_loop)
     {
         elapsed = get_current_msec() - capture_last_time;
+        size_t pending = buffers.pending();
+        bool need_slot = buffers.capture().ready_capture() != true;
+        bool need_pace = elapsed < ms;
+        bool need_drain = pending >= BUFFER_POOL_HIGH_WATER;
+        if (!need_slot && !need_pace && !need_drain)
+        {
+            break;
+        }
+        if (need_drain && !backpressure_logged)
+        {
+            uint64_t enc_age = get_current_msec() - encode_last_time_ms.load();
+            std::cerr << "capture pause: encode backlog pending=" << pending
+                      << " (high_water=" << BUFFER_POOL_HIGH_WATER
+                      << ", encode_idle_ms=" << enc_age << ")"
+                      << std::endl;
+            backpressure_logged = true;
+        }
         std::this_thread::sleep_for(std::chrono::microseconds(idle_time));
     }
 
