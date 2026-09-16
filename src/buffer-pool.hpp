@@ -62,6 +62,11 @@ public:
         return bufs[i];
     }
 
+    T* at(size_t i)
+    {
+        return bufs[i];
+    }
+
     /* Frames queued for encode (available=true). Used for soft backpressure. */
     size_t pending() const
     {

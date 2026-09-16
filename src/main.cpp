@@ -1341,9 +1341,15 @@ void request_next_frame(bool reallocate)
     }
 
 
+    // Always clear the global after destroy. If we bail before create_frame
+    // (exit_main_loop during dmabuf alloc, or wl_buffer still NULL), leaving
+    // the freed proxy in `frame` makes main()'s teardown double-free it —
+    // SIGSEGV in wl_proxy_marshal_flags (seen under Miracast SIGUSR1 storms).
     if (frame != NULL)
     {
         ext_image_copy_capture_frame_v1_destroy(frame);
+        frame = NULL;
+        buffer.frame = NULL;
     }
 
     if (buffer.wl_buffer)
@@ -1846,6 +1852,14 @@ int main(int argc, char *argv[])
     if (writer_thread.joinable())
     {
         writer_thread.join();
+    }
+
+    // Drop buffer aliases first so we never destroy the same proxy twice.
+    for (size_t i = 0; i < buffers.size(); ++i)
+    {
+        auto buffer = buffers.at(i);
+        if (buffer)
+            buffer->frame = NULL;
     }
 
     if (frame != NULL)
