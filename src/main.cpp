@@ -1286,7 +1286,11 @@ void request_next_frame(bool reallocate)
     // Wait for a free buffer, framerate pace, and soft encode backpressure.
     // When pending is near the pool cap, pause capture so a slow/stalled
     // stdout consumer (e.g. ffmpeg VAAPI pipe) does not storm bufs_size.
+    // If encode stays idle too long while pending is high, break out so the
+    // session can fail/recover (FluxCast VIDEO_STALL) instead of wedging
+    // forever — that was the ~30–40s Miracast black-TV freeze.
     bool backpressure_logged = false;
+    uint64_t drain_wait_started = 0;
     while (!exit_main_loop)
     {
         elapsed = get_current_msec() - capture_last_time;
@@ -1298,14 +1302,30 @@ void request_next_frame(bool reallocate)
         {
             break;
         }
-        if (need_drain && !backpressure_logged)
+        if (need_drain)
         {
             uint64_t enc_age = get_current_msec() - encode_last_time_ms.load();
-            std::cerr << "capture pause: encode backlog pending=" << pending
-                      << " (high_water=" << BUFFER_POOL_HIGH_WATER
-                      << ", encode_idle_ms=" << enc_age << ")"
-                      << std::endl;
-            backpressure_logged = true;
+            if (!backpressure_logged)
+            {
+                std::cerr << "capture pause: encode backlog pending=" << pending
+                          << " (high_water=" << BUFFER_POOL_HIGH_WATER
+                          << ", encode_idle_ms=" << enc_age << ")"
+                          << std::endl;
+                backpressure_logged = true;
+                drain_wait_started = get_current_msec();
+            }
+            // Encode thread wedged / stdout blocked — don't sleep forever.
+            if (enc_age > 2000 ||
+                (drain_wait_started &&
+                 get_current_msec() - drain_wait_started > 2500))
+            {
+                std::cerr << "capture pause timeout: encode_idle_ms=" << enc_age
+                          << " pending=" << pending
+                          << " — aborting capture wait for recovery"
+                          << std::endl;
+                exit_main_loop = true;
+                break;
+            }
         }
         std::this_thread::sleep_for(std::chrono::microseconds(idle_time));
     }
