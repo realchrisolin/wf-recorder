@@ -567,10 +567,12 @@ void FrameWriter::init_video_stream()
     };
     const std::string b_txt = opt_or({"b", "bit_rate", "bitrate"});
     const std::string max_txt = opt_or({"maxrate", "rc_max_rate"});
+    const std::string min_txt = opt_or({"minrate", "rc_min_rate"});
     const std::string buf_txt = opt_or({"bufsize", "rc_buffer_size"});
     const std::string rc_txt = opt_or({"rc_mode"});
     const int64_t bit_rate = parse_bitrate_bits(b_txt);
     const int64_t max_rate = parse_bitrate_bits(max_txt);
+    const int64_t min_rate = parse_bitrate_bits(min_txt);
     const int64_t buf_size = parse_bitrate_bits(buf_txt);
     // push_frame() stamps PTS in microseconds — time_base must stay 1/1e6.
     // Bitrate RC (CBR/VBR/QVBR) still needs a real framerate; without it Intel
@@ -600,6 +602,16 @@ void FrameWriter::init_video_stream()
         std::cerr << "Applying codec rc_max_rate: " << max_rate << std::endl;
     } else if (bit_rate > 0) {
         videoCodecCtx->rc_max_rate = bit_rate;
+    }
+    // QVBR on Intel otherwise sits at ~2–3 Mbps despite a 14 Mbps target.
+    // A minrate floor keeps average near TargetBitRate (Smart View–class spend).
+    if (min_rate > 0) {
+        videoCodecCtx->rc_min_rate = min_rate;
+        std::cerr << "Applying codec rc_min_rate: " << min_rate << std::endl;
+    } else if (bit_rate > 0 && (rc_txt == "QVBR" || rc_txt == "VBR" || rc_txt == "AVBR")) {
+        videoCodecCtx->rc_min_rate = (bit_rate * 7) / 10; // ~70% floor
+        std::cerr << "Applying codec rc_min_rate (QVBR floor): "
+                  << videoCodecCtx->rc_min_rate << std::endl;
     }
     if (buf_size > 0) {
         videoCodecCtx->rc_buffer_size = static_cast<int>(std::min<int64_t>(buf_size, INT_MAX));
