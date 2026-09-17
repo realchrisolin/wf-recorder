@@ -572,21 +572,18 @@ void FrameWriter::init_video_stream()
     const int64_t bit_rate = parse_bitrate_bits(b_txt);
     const int64_t max_rate = parse_bitrate_bits(max_txt);
     const int64_t buf_size = parse_bitrate_bits(buf_txt);
-    // Default capture path uses microsecond stamps. Bitrate RC (CBR/VBR/QVBR)
-    // on h264_vaapi needs a frame-rate time_base or Intel BRC undershoots to
-    // ~0.5–3 Mbps despite bit_rate being set (on-device Miracast).
+    // push_frame() stamps PTS in microseconds — time_base must stay 1/1e6.
+    // Bitrate RC (CBR/VBR/QVBR) still needs a real framerate; without it Intel
+    // h264_vaapi BRC undershoots to ~0.5–4 Mbps despite bit_rate being set.
+    // NOTE: init_video_filters() below overwrites framerate to {1,0} — we
+    // restore it again after filters (see post-filter block).
     const bool want_bitrate_rc = bit_rate > 0
         || rc_txt == "CBR" || rc_txt == "VBR" || rc_txt == "QVBR" || rc_txt == "AVBR";
     if (params.framerate) {
         std::cerr << "Framerate: " << params.framerate << std::endl;
         videoCodecCtx->framerate = AVRational{params.framerate, 1};
-        if (want_bitrate_rc)
-            videoCodecCtx->time_base = AVRational{1, params.framerate};
-        else
-            videoCodecCtx->time_base = US_RATIONAL;
-    } else {
-        videoCodecCtx->time_base = US_RATIONAL;
     }
+    videoCodecCtx->time_base = US_RATIONAL;
 
     if (params.bframes != -1)
         videoCodecCtx->max_b_frames = params.bframes;
@@ -618,6 +615,19 @@ void FrameWriter::init_video_stream()
     //
     // After loading the filters, we should update the hw frames ctx.
     init_video_filters(codec);
+
+    // init_video_filters() copies the buffer filter's 1/1e6 time_base (good —
+    // matches pts=usec) but clears framerate to {1,0}. Restore fps so VAAPI
+    // bitrate RC can size bits/frame before avcodec_open2.
+    if (params.framerate) {
+        videoCodecCtx->framerate = AVRational{params.framerate, 1};
+        videoCodecCtx->time_base = US_RATIONAL;
+        if (want_bitrate_rc) {
+            std::cerr << "Restored framerate after filters for bitrate RC: "
+                      << params.framerate << " (time_base=1/1e6 matches PTS)"
+                      << std::endl;
+        }
+    }
 
     if (this->hw_frame_context) {
       videoCodecCtx->hw_frames_ctx = av_buffer_ref(this->hw_frame_context);
