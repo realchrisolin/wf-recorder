@@ -551,6 +551,18 @@ static int64_t parse_bitrate_bits(const std::string &text)
     return static_cast<int64_t>(value);
 }
 
+// GOP / keyint: frames. Reject 0 so the caller can fall back to a default.
+static int parse_gop_frames(const std::string &text)
+{
+    if (text.empty())
+        return 0;
+    char *end = nullptr;
+    long value = std::strtol(text.c_str(), &end, 10);
+    if (end == text.c_str() || value < 1 || value > INT_MAX)
+        return 0;
+    return static_cast<int>(value);
+}
+
 void FrameWriter::init_video_stream()
 {
     videoCodecCtx = avcodec_alloc_context3(codec);
@@ -616,6 +628,20 @@ void FrameWriter::init_video_stream()
     if (buf_size > 0) {
         videoCodecCtx->rc_buffer_size = static_cast<int>(std::min<int64_t>(buf_size, INT_MAX));
         std::cerr << "Applying codec rc_buffer_size: " << videoCodecCtx->rc_buffer_size << std::endl;
+    }
+    // -p gop_size is AVCodecContext.g, not a h264_vaapi private option.
+    // Leaving it only in the av_dict made Intel use a ~2 s intra period.
+    {
+        const std::string gop_txt = opt_or({"gop_size", "g"});
+        const std::string keyint_txt = opt_or({"keyint_min"});
+        int gop = parse_gop_frames(gop_txt);
+        if (gop <= 0)
+            gop = 60;
+        videoCodecCtx->gop_size = gop;
+        int keyint = parse_gop_frames(keyint_txt);
+        videoCodecCtx->keyint_min = keyint > 0 ? keyint : gop;
+        std::cerr << "Applying codec gop_size: " << gop
+                  << " keyint_min: " << videoCodecCtx->keyint_min << std::endl;
     }
 
     if (!params.hw_device.empty()) {
